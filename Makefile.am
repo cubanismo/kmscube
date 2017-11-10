@@ -59,3 +59,8 @@ kmscube_LDADD += $(GST_LIBS)
 kmscube_CFLAGS += $(GST_CFLAGS)
 kmscube_SOURCES += cube-video.c gst-decoder.c
 endif
+
+if ENABLE_ALLOCATOR
+kmscube_LDADD += $(ALLOCATOR_LIBS)
+kmscube_CFLAGS += $(ALLOCATOR_CFLAGS)
+endif

@@ -49,6 +49,16 @@ if test "x$HAVE_GST" = "xyes"; then
 fi
 AM_CONDITIONAL(ENABLE_GST, [test "x$HAVE_GST" = "xyes"])
 
+# Check for the generic allocator library and enable it if present:
+PKG_CHECK_MODULES(ALLOCATOR, liballocator,
+		  [HAVE_ALLOCATOR=yes], [HAVE_ALLOCATOR=no])
+
+if test "x$HAVE_ALLOCATOR" = "xyes"; then
+	AC_DEFINE(HAVE_ALLOCATOR, 1, [Have generic device memory allocator support])
+	AC_MSG_NOTICE([Building with generic device memory allocator support])
+fi
+AM_CONDITIONAL(ENABLE_ALLOCATOR, [test "x$HAVE_ALLOCATOR" = "xyes"])
+
 AC_CHECK_LIB([gbm], [gbm_bo_get_modifier], [gbm_modifiers=yes], [])
 
 AC_ARG_ENABLE([gbm-modifiers],
