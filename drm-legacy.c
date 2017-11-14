@@ -41,7 +41,7 @@ static void page_flip_handler(int fd, unsigned int frame,
 	*waiting_for_flip = 0;
 }
 
-static int legacy_run(const struct gbm *gbm, const struct egl *egl)
+static int legacy_run(const struct surfmgr *surfmgr, const struct egl *egl)
 {
 	fd_set fds;
 	drmEventContext evctx = {
@@ -58,7 +58,7 @@ static int legacy_run(const struct gbm *gbm, const struct egl *egl)
 	FD_SET(drm.fd, &fds);
 
 	eglSwapBuffers(egl->display, egl->surface);
-	bo = gbm_surface_lock_front_buffer(gbm->surface);
+	bo = gbm_surface_lock_front_buffer(surfmgr->gbm->surface);
 	fb = drm_fb_get_from_bo(bo);
 	if (!fb) {
 		fprintf(stderr, "Failed to get a new framebuffer BO\n");
@@ -80,7 +80,7 @@ static int legacy_run(const struct gbm *gbm, const struct egl *egl)
 		egl->draw(i++);
 
 		eglSwapBuffers(egl->display, egl->surface);
-		next_bo = gbm_surface_lock_front_buffer(gbm->surface);
+		next_bo = gbm_surface_lock_front_buffer(surfmgr->gbm->surface);
 		fb = drm_fb_get_from_bo(next_bo);
 		if (!fb) {
 			fprintf(stderr, "Failed to get a new framebuffer BO\n");
@@ -115,7 +115,7 @@ static int legacy_run(const struct gbm *gbm, const struct egl *egl)
 		}
 
 		/* release last buffer to render on again: */
-		gbm_surface_release_buffer(gbm->surface, bo);
+		gbm_surface_release_buffer(surfmgr->gbm->surface, bo);
 		bo = next_bo;
 	}
 

@@ -30,6 +30,7 @@
 #include <getopt.h>
 
 #include "common.h"
+#include "surface-manager.h"
 #include "drm-common.h"
 
 #ifdef HAVE_GST
@@ -40,7 +41,7 @@ GST_DEBUG_CATEGORY(kmscube_debug);
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 static const struct egl *egl;
-static const struct gbm *gbm;
+static const struct surfmgr *surfmgr;
 static const struct drm *drm;
 
 static const char *shortopts = "AD:M:m:V:";
@@ -130,19 +131,24 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	gbm = init_gbm(drm->fd, drm->mode->hdisplay, drm->mode->vdisplay,
-			modifier);
-	if (!gbm) {
-		printf("failed to initialize GBM\n");
+	surfmgr = init_surfmgr(drm->fd, drm->mode->hdisplay, drm->mode->vdisplay,
+						   modifier);
+	if (!surfmgr) {
+		printf("failed to initialize any surface manager APIs\n");
+		return -1;
+	}
+
+	if (!atomic && !surfmgr->gbm) {
+		printf("Legacy DRM requires GBM\n");
 		return -1;
 	}
 
 	if (mode == SMOOTH)
-		egl = init_cube_smooth(gbm);
+		egl = init_cube_smooth(surfmgr);
 	else if (mode == VIDEO)
-		egl = init_cube_video(gbm, video);
+		egl = init_cube_video(surfmgr, video);
 	else
-		egl = init_cube_tex(gbm, mode);
+		egl = init_cube_tex(surfmgr, mode);
 
 	if (!egl) {
 		printf("failed to initialize EGL\n");
@@ -153,5 +159,5 @@ int main(int argc, char *argv[])
 	glClearColor(0.5, 0.5, 0.5, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
 
-	return drm->run(gbm, egl);
+	return drm->run(surfmgr, egl);
 }

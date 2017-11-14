@@ -30,6 +30,7 @@
 
 #include "common.h"
 #include "drm-common.h"
+#include "surface-manager.h"
 
 #define VOID2U64(x) ((uint64_t)(unsigned long)(x))
 
@@ -173,10 +174,9 @@ static EGLSyncKHR create_fence(const struct egl *egl, int fd)
 	return fence;
 }
 
-static int atomic_run(const struct gbm *gbm, const struct egl *egl)
+static int atomic_run(const struct surfmgr *surfmgr, const struct egl *egl)
 {
-	struct gbm_bo *bo = NULL;
-	struct drm_fb *fb;
+	struct drm_fb *fb = NULL;
 	uint32_t i = 0;
 	uint32_t flags = DRM_MODE_ATOMIC_NONBLOCK;
 	int ret;
@@ -192,7 +192,7 @@ static int atomic_run(const struct gbm *gbm, const struct egl *egl)
 	flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
 
 	while (1) {
-		struct gbm_bo *next_bo;
+		struct drm_fb *last_fb;
 		EGLSyncKHR gpu_fence = NULL;   /* out-fence from gpu, in-fence to kms */
 		EGLSyncKHR kms_fence = NULL;   /* in-fence to gpu, out-fence from kms */
 
@@ -228,12 +228,8 @@ static int atomic_run(const struct gbm *gbm, const struct egl *egl)
 		egl->eglDestroySyncKHR(egl->display, gpu_fence);
 		assert(drm.kms_in_fence_fd != -1);
 
-		next_bo = gbm_surface_lock_front_buffer(gbm->surface);
-		if (!next_bo) {
-			printf("Failed to lock frontbuffer\n");
-			return -1;
-		}
-		fb = drm_fb_get_from_bo(next_bo);
+		last_fb = fb;
+		fb = surfmgr_get_next_fb(surfmgr);
 		if (!fb) {
 			printf("Failed to get a new framebuffer BO\n");
 			return -1;
@@ -268,9 +264,7 @@ static int atomic_run(const struct gbm *gbm, const struct egl *egl)
 		}
 
 		/* release last buffer to render on again: */
-		if (bo)
-			gbm_surface_release_buffer(gbm->surface, bo);
-		bo = next_bo;
+		surfmgr_release_fb(surfmgr, last_fb);
 
 		/* Allow a modeset change for the first commit only. */
 		flags &= ~(DRM_MODE_ATOMIC_ALLOW_MODESET);

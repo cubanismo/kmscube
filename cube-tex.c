@@ -497,13 +497,18 @@ static void draw_cube_tex(unsigned i)
 	glDrawArrays(GL_TRIANGLE_STRIP, 20, 4);
 }
 
-const struct egl * init_cube_tex(const struct gbm *gbm, enum mode mode)
+const struct egl * init_cube_tex(const struct surfmgr *surfmgr, enum mode mode)
 {
 	const char *fragment_shader_source = (mode == NV12_2IMG) ?
 			fragment_shader_source_2img : fragment_shader_source_1img;
 	int ret;
 
-	ret = init_egl(&gl.egl, gbm);
+	if (!surfmgr->gbm) {
+		printf("texture support currently requires GBM\n");
+		return NULL;
+	}
+
+	ret = init_egl(&gl.egl, surfmgr);
 	if (ret)
 		return NULL;
 
@@ -512,9 +517,9 @@ const struct egl * init_cube_tex(const struct gbm *gbm, enum mode mode)
 	    egl_check(&gl.egl, eglDestroyImageKHR))
 		return NULL;
 
-	gl.aspect = (GLfloat)(gbm->height) / (GLfloat)(gbm->width);
+	gl.aspect = (GLfloat)(surfmgr->height) / (GLfloat)(surfmgr->width);
 	gl.mode = mode;
-	gl.gbm = gbm;
+	gl.gbm = surfmgr->gbm;
 
 	ret = create_program(vertex_shader_source, fragment_shader_source);
 	if (ret < 0)
@@ -542,7 +547,7 @@ const struct egl * init_cube_tex(const struct gbm *gbm, enum mode mode)
 		gl.texture   = glGetUniformLocation(gl.program, "uTex");
 	}
 
-	glViewport(0, 0, gbm->width, gbm->height);
+	glViewport(0, 0, surfmgr->width, surfmgr->height);
 	glEnable(GL_CULL_FACE);
 
 	gl.positionsoffset = 0;

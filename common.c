@@ -31,55 +31,6 @@
 
 #include "common.h"
 
-static struct gbm gbm;
-
-#ifdef HAVE_GBM_MODIFIERS
-static int
-get_modifiers(uint64_t **mods)
-{
-	/* Assumed LINEAR is supported everywhere */
-	static uint64_t modifiers[] = {DRM_FORMAT_MOD_LINEAR};
-	*mods = modifiers;
-	return 1;
-}
-#endif
-
-const struct gbm * init_gbm(int drm_fd, int w, int h, uint64_t modifier)
-{
-	gbm.dev = gbm_create_device(drm_fd);
-
-#ifndef HAVE_GBM_MODIFIERS
-	if (modifier != DRM_FORMAT_MOD_INVALID) {
-		fprintf(stderr, "Modifiers requested but support isn't available\n");
-		return NULL;
-	}
-	gbm.surface = gbm_surface_create(gbm.dev, w, h,
-			GBM_FORMAT_XRGB8888,
-			GBM_BO_USE_SCANOUT | GBM_BO_USE_RENDERING);
-#else
-	uint64_t *mods;
-	int count;
-	if (modifier != DRM_FORMAT_MOD_INVALID) {
-		count = 1;
-		mods = &modifier;
-	} else {
-		count = get_modifiers(&mods);
-	}
-	gbm.surface = gbm_surface_create_with_modifiers(gbm.dev, w, h,
-			GBM_FORMAT_XRGB8888, mods, count);
-#endif
-
-	if (!gbm.surface) {
-		printf("failed to create gbm surface\n");
-		return NULL;
-	}
-
-	gbm.width = w;
-	gbm.height = h;
-
-	return &gbm;
-}
-
 static bool has_ext(const char *extension_list, const char *ext)
 {
 	const char *ptr = extension_list;
@@ -100,7 +51,7 @@ static bool has_ext(const char *extension_list, const char *ext)
 	}
 }
 
-int init_egl(struct egl *egl, const struct gbm *gbm)
+int init_egl(struct egl *egl, const struct surfmgr *surfmgr)
 {
 	EGLint major, minor, n;
 
@@ -139,9 +90,9 @@ int init_egl(struct egl *egl, const struct gbm *gbm)
 
 	if (egl->eglGetPlatformDisplayEXT) {
 		egl->display = egl->eglGetPlatformDisplayEXT(EGL_PLATFORM_GBM_KHR,
-				gbm->dev, NULL);
+				surfmgr->gbm->dev, NULL);
 	} else {
-		egl->display = eglGetDisplay((void *)gbm->dev);
+		egl->display = eglGetDisplay((void *)surfmgr->gbm->dev);
 	}
 
 	if (!eglInitialize(egl->display, &major, &minor)) {
@@ -187,7 +138,7 @@ int init_egl(struct egl *egl, const struct gbm *gbm)
 	}
 
 	egl->surface = eglCreateWindowSurface(egl->display, egl->config,
-			(EGLNativeWindowType)gbm->surface, NULL);
+			(EGLNativeWindowType)surfmgr->gbm->surface, NULL);
 	if (egl->surface == EGL_NO_SURFACE) {
 		printf("failed to create egl surface\n");
 		return -1;

@@ -24,6 +24,8 @@
 #ifndef _COMMON_H
 #define _COMMON_H
 
+#include <stdio.h>
+
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
 #include <EGL/egl.h>
@@ -60,11 +62,13 @@ EGLAPI EGLSurface EGLAPIENTRY eglCreatePlatformPixmapSurfaceEXT (EGLDisplay dpy,
 struct gbm {
 	struct gbm_device *dev;
 	struct gbm_surface *surface;
-	int width, height;
 };
 
-const struct gbm * init_gbm(int drm_fd, int w, int h, uint64_t modifier);
+struct surfmgr {
+	const struct gbm * gbm;
 
+	int width, height;
+};
 
 struct egl {
 	EGLDisplay display;
@@ -96,7 +100,7 @@ static inline int __egl_check(void *ptr, const char *name)
 
 #define egl_check(egl, name) __egl_check((egl)->name, #name)
 
-int init_egl(struct egl *egl, const struct gbm *gbm);
+int init_egl(struct egl *egl, const struct surfmgr *surfmgr);
 int create_program(const char *vs_src, const char *fs_src);
 int link_program(unsigned program);
 
@@ -108,8 +112,8 @@ enum mode {
 	VIDEO,         /* video textured cube */
 };
 
-const struct egl * init_cube_smooth(const struct gbm *gbm);
-const struct egl * init_cube_tex(const struct gbm *gbm, enum mode mode);
+const struct egl * init_cube_smooth(const struct surfmgr *surfmgr);
+const struct egl * init_cube_tex(const struct surfmgr *surfmgr, enum mode mode);
 
 #ifdef HAVE_GST
 
@@ -118,13 +122,13 @@ struct decoder * video_init(const struct egl *egl, const struct gbm *gbm, const 
 EGLImage video_frame(struct decoder *dec);
 void video_deinit(struct decoder *dec);
 
-const struct egl * init_cube_video(const struct gbm *gbm, const char *video);
+const struct egl * init_cube_video(const struct surfmgr *surfmgr, const char *video);
 
 #else
 static inline const struct egl *
-init_cube_video(const struct gbm *gbm, const char *video)
+init_cube_video(const struct surfmgr *surfmgr, const char *video)
 {
-	(void)gbm; (void)video;
+	(void)surfmgr; (void)video;
 	printf("no GStreamer support!\n");
 	return NULL;
 }

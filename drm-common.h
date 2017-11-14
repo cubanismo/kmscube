@@ -63,7 +63,7 @@ struct drm {
 	uint32_t crtc_id;
 	uint32_t connector_id;
 
-	int (*run)(const struct gbm *gbm, const struct egl *egl);
+	int (*run)(const struct surfmgr *surfmgr, const struct egl *egl);
 };
 
 struct drm_fb {

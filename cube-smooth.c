@@ -218,15 +218,15 @@ static void draw_cube_smooth(unsigned i)
 	glDrawArrays(GL_TRIANGLE_STRIP, 20, 4);
 }
 
-const struct egl * init_cube_smooth(const struct gbm *gbm)
+const struct egl * init_cube_smooth(const struct surfmgr *surfmgr)
 {
 	int ret;
 
-	ret = init_egl(&gl.egl, gbm);
+	ret = init_egl(&gl.egl, surfmgr);
 	if (ret)
 		return NULL;
 
-	gl.aspect = (GLfloat)(gbm->height) / (GLfloat)(gbm->width);
+	gl.aspect = (GLfloat)(surfmgr->height) / (GLfloat)(surfmgr->width);
 
 	ret = create_program(vertex_shader_source, fragment_shader_source);
 	if (ret < 0)
@@ -248,7 +248,7 @@ const struct egl * init_cube_smooth(const struct gbm *gbm)
 	gl.modelviewprojectionmatrix = glGetUniformLocation(gl.program, "modelviewprojectionMatrix");
 	gl.normalmatrix = glGetUniformLocation(gl.program, "normalMatrix");
 
-	glViewport(0, 0, gbm->width, gbm->height);
+	glViewport(0, 0, surfmgr->width, surfmgr->height);
 	glEnable(GL_CULL_FACE);
 
 	gl.positionsoffset = 0;
