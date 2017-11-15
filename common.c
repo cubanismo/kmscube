@@ -30,6 +30,7 @@
 #include <string.h>
 
 #include "common.h"
+#include "surface-manager.h"
 
 static bool has_ext(const char *extension_list, const char *ext)
 {
@@ -206,6 +207,16 @@ int init_egl(struct egl *egl, const struct surfmgr *surfmgr)
 	printf("===================================\n");
 
 	get_proc_gl(GL_OES_EGL_image, glEGLImageTargetTexture2DOES);
+	get_proc_gl(GL_EXT_memory_object, glCreateMemoryObjectsEXT);
+	get_proc_gl(GL_EXT_memory_object, glMemoryObjectParameterivEXT);
+	get_proc_gl(GL_EXT_memory_object, glTexStorageMem2DEXT);
+	get_proc_gl(GL_EXT_memory_object_fd, glImportMemoryFdEXT);
+	get_proc_gl(GL_NVX_unix_allocator_import, glTexParametervNVX);
+
+	if (init_surfmgr_egl(surfmgr, egl)) {
+        printf("Failed to initialize surface manager EGL and GL state\n");
+        return -1;
+    }
 
 	return 0;
 }

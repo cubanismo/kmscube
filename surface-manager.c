@@ -248,6 +248,75 @@ const struct surfmgr * init_surfmgr(int drm_fd, int w, int h, uint64_t modifier)
 	return NULL;
 }
 
+int init_surfmgr_egl(const struct surfmgr *surfmgr, const struct egl *egl)
+{
+#ifdef HAVE_ALLOCATOR
+	if (surfmgr->allocator) {
+		uint32_t i;
+		for (i = 0; i < ARRAY_SIZE(surfmgr->allocator->allocations); i++) {
+			const struct allocation *alloc = &surfmgr->allocator->allocations[i];
+			void *metadata;
+			size_t metadata_size;
+			uint64_t size;
+			int fd;
+
+			static const GLint trueParam = GL_TRUE;
+
+			if (device_export_allocation(allocator.dev,
+										 alloc->alloc,
+										 &size,
+										 &metadata_size,
+										 &metadata,
+										 &fd)) {
+				printf("Failed to export allocator allocation\n");
+				return -1;
+			}
+
+			egl->glCreateMemoryObjectsEXT(1,
+                                          &allocator.allocations[i].memoryObject);
+			egl->glMemoryObjectParameterivEXT(alloc->memoryObject,
+											  GL_DEDICATED_MEMORY_OBJECT_EXT,
+											  &trueParam);
+			egl->glImportMemoryFdEXT(alloc->memoryObject,
+									 size,
+									 GL_HANDLE_TYPE_ALLOCATOR_FD_NVX,
+									 fd);
+
+			glGenTextures(1, &allocator.allocations[i].texture);
+			glBindTexture(GL_TEXTURE_2D,
+                          alloc->texture);
+			glTexParameteri(GL_TEXTURE_2D,
+							GL_TEXTURE_TILING_EXT,
+							GL_OPTIMAL_TILING_EXT);
+			egl->glTexParametervNVX(GL_TEXTURE_2D,
+									GL_SURFACE_METADATA_NVX,
+									metadata_size,
+									metadata);
+			egl->glTexStorageMem2DEXT(GL_TEXTURE_2D,
+									  1, GL_RGBA8_OES,
+									  surfmgr->width, surfmgr->height,
+									  alloc->memoryObject, 0);
+
+			glGenFramebuffers(1, &allocator.allocations[i].framebuffer);
+			glBindFramebuffer(GL_FRAMEBUFFER, alloc->framebuffer);
+			glFramebufferTexture2D(GL_FRAMEBUFFER,
+								   GL_COLOR_ATTACHMENT0,
+								   GL_TEXTURE_2D,
+								   alloc->texture,
+								   0);
+		}
+
+		glBindFramebuffer(GL_FRAMEBUFFER,
+						  surfmgr->allocator->allocations[0].framebuffer);
+	}
+#else
+	(void)surfmgr;
+	(void)egl;
+#endif /* HAVE_ALLOCATOR */
+
+    return 0;
+}
+
 struct drm_fb *surfmgr_get_next_fb(const struct surfmgr *surfmgr)
 {
 	struct drm_fb *fb = NULL;
