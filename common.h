@@ -81,6 +81,8 @@ EGLAPI EGLBoolean EGLAPIENTRY eglQueryDisplayAttribEXT (EGLDisplay dpy, EGLint a
 #endif
 #endif /* EGL_EXT_device_base */
 
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 struct gbm {
 	struct gbm_device *dev;
 	struct gbm_surface *surface;
@@ -89,6 +91,8 @@ struct gbm {
 #ifdef HAVE_ALLOCATOR
 struct allocator {
 	device_t *dev;
+
+	allocation_t *allocations[2]; /* double-buffering */
 };
 #endif /* HAVE_ALLOCATOR */
 

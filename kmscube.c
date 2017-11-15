@@ -38,8 +38,6 @@
 GST_DEBUG_CATEGORY(kmscube_debug);
 #endif
 
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
-
 static const struct egl *egl;
 static const struct surfmgr *surfmgr;
 static const struct drm *drm;

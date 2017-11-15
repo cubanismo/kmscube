@@ -80,11 +80,90 @@ static const struct gbm * init_gbm(int drm_fd, int w, int h, uint64_t modifier)
 #ifdef HAVE_ALLOCATOR
 static const struct allocator * init_allocator(int drm_fd, int w, int h)
 {
+	assertion_t assertion = {
+		w,			/* width */
+		h,			/* height */
+		NULL,		/* format */
+		NULL		/* ext */
+	};
+
+	static const usage_display_t usage_display = {
+		{
+			VENDOR_BASE,							/* Usage vendor ID */
+			USAGE_BASE_DISPLAY,						/* Per-vendor usage ID */
+			USAGE_LENGTH_IN_WORDS(usage_display_t)	/* length_in_words */
+		},
+
+		USAGE_BASE_DISPLAY_ROTATION_0				/* rotation_types */
+	};
+
+	static const usage_texture_t usage_texture = {
+		{
+			VENDOR_BASE,							/* Usage vendor ID */
+			USAGE_BASE_TEXTURE,						/* Per-vendor usage ID */
+			USAGE_LENGTH_IN_WORDS(usage_texture_t)	/* length_in_words */
+		}
+	};
+
+	usage_t uses[] = {
+		{
+			NULL,							/* dev (filled in below) */
+			&usage_display.header			/* usage */
+		},
+		{
+			NULL,							/* dev (filled in below) */
+			&usage_texture.header			/* usage */
+		}
+	};
+
+	capability_set_t *capability_sets;
+	uint32_t num_capability_sets;
+	uint32_t i;
+	uint32_t allocs = 0;
+
 	allocator.dev = device_create(drm_fd);
-	(void)w;
-	(void)h;
+
+	if (!allocator.dev) {
+		goto fail;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(uses); i++) {
+		uses[i].dev = allocator.dev;
+	}
+
+	if (device_get_capabilities(allocator.dev,
+								&assertion,
+								ARRAY_SIZE(uses),
+								uses,
+								&num_capability_sets,
+								&capability_sets) ||
+		num_capability_sets < 1) {
+		printf("Failed to query capability sets\n");
+		goto fail;
+	}
+
+	for (; allocs < ARRAY_SIZE(allocator.allocations); allocs++) {
+		if (device_create_allocation(allocator.dev,
+									 &assertion,
+									 &capability_sets[0],
+									 &allocator.allocations[allocs])) {
+			printf("Failed to create an allocation\n");
+			goto fail;
+		}
+	}
 
 	return &allocator;
+
+fail:
+	for (i = 0; i < allocs; i++) {
+		device_destroy_allocation(allocator.dev,
+								  allocator.allocations[i]);
+	}
+
+	device_destroy(allocator.dev);
+	allocator.dev = NULL;
+
+	return NULL;
 }
 #endif /* HAVE_ALLOCATOR */
 
