@@ -97,7 +97,9 @@ struct allocation {
 struct allocator {
 	device_t *dev;
 
-	struct allocation allocations[2]; /* double-buffer */
+	struct allocation allocations[2]; /* double-buffering */
+
+	uint32_t next_allocation;
 };
 #endif /* HAVE_ALLOCATOR */
 

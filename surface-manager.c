@@ -196,10 +196,12 @@ static const struct allocator * init_allocator(int drm_fd, int w, int h)
 		drmIoctl(drm_fd, DRM_IOCTL_GEM_CLOSE, &closeParams);
 		free(metadata);
 
-		if (!allocator.allocations[allocs].fb) {
+		if (!alloc->fb) {
 			goto fail;
 		}
 	}
+
+	allocator.next_allocation = 0;
 
 	return &allocator;
 
@@ -212,7 +214,7 @@ fail:
 		}
 
 		device_destroy_allocation(allocator.dev,
-								  allocator.allocations[i].alloc);
+								  alloc->alloc);
 	}
 
 	device_destroy(allocator.dev);
@@ -262,6 +264,14 @@ struct drm_fb *surfmgr_get_next_fb(const struct surfmgr *surfmgr)
 
 		fb = drm_fb_get_from_bo(bo);
 	}
+#ifdef HAVE_ALLOCATOR
+	else if (surfmgr->allocator) {
+		uint32_t n = surfmgr->allocator->next_allocation;
+		fb = surfmgr->allocator->allocations[n].fb;
+		allocator.next_allocation =
+			(n + 1) % ARRAY_SIZE(surfmgr->allocator->allocations);
+	}
+#endif
 
 	return fb;
 }
@@ -271,4 +281,9 @@ void surfmgr_release_fb(const struct surfmgr *surfmgr, struct drm_fb *fb)
 	if (surfmgr->gbm) {
 		gbm_surface_release_buffer(surfmgr->gbm->surface, fb->bo);
 	}
+#ifdef HAVE_ALLOCATOR
+	else if (surfmgr->allocator) {
+		/* Nothing to do for the allocator case */
+	}
+#endif
 }
