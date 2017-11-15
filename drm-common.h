@@ -72,6 +72,15 @@ struct drm_fb {
 };
 
 struct drm_fb * drm_fb_get_from_bo(struct gbm_bo *bo);
+#ifdef HAVE_ALLOCATOR
+struct drm_fb * drm_fb_get_from_gem(int drm_fd,
+									uint32_t gemHandle,
+									uint32_t width,
+									uint32_t height,
+									size_t metadata_size,
+									void *metadata);
+#endif
+void drm_fb_destroy(int drm_fd, struct drm_fb *fb);
 
 int init_drm(struct drm *drm, const char *device);
 const struct drm * init_drm_legacy(const char *device);

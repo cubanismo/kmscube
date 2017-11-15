@@ -89,10 +89,15 @@ struct gbm {
 };
 
 #ifdef HAVE_ALLOCATOR
+struct allocation {
+	allocation_t *alloc;
+	struct drm_fb *fb;
+};
+
 struct allocator {
 	device_t *dev;
 
-	allocation_t *allocations[2]; /* double-buffering */
+	struct allocation allocations[2]; /* double-buffer */
 };
 #endif /* HAVE_ALLOCATOR */
 

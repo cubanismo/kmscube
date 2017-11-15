@@ -31,16 +31,21 @@
 #include "common.h"
 #include "drm-common.h"
 
+void drm_fb_destroy(int drm_fd, struct drm_fb *fb)
+{
+	if (fb->fb_id)
+		drmModeRmFB(drm_fd, fb->fb_id);
+
+	free(fb);
+}
+
 static void
 drm_fb_destroy_callback(struct gbm_bo *bo, void *data)
 {
 	int drm_fd = gbm_device_get_fd(gbm_bo_get_device(bo));
 	struct drm_fb *fb = data;
 
-	if (fb->fb_id)
-		drmModeRmFB(drm_fd, fb->fb_id);
-
-	free(fb);
+	drm_fb_destroy(drm_fd, fb);
 }
 
 struct drm_fb * drm_fb_get_from_bo(struct gbm_bo *bo)
@@ -102,6 +107,40 @@ struct drm_fb * drm_fb_get_from_bo(struct gbm_bo *bo)
 
 	return fb;
 }
+
+#ifdef HAVE_ALLOCATOR
+struct drm_fb * drm_fb_get_from_gem(int drm_fd,
+									uint32_t gemHandle,
+									uint32_t width,
+									uint32_t height,
+									size_t metadata_size,
+									void *metadata)
+{
+	uint32_t strides[4] = {0}, handles[4] = {0},
+			 offsets[4] = {0}, flags = 0;
+	struct drm_fb *fb = calloc(1, sizeof(*fb));
+	(void)metadata_size;
+	(void)metadata; /* XXX Need method to transmit this through AddFB2 */
+
+	if (!fb) return NULL;
+
+	handles[0] = gemHandle;
+	strides[0] = width * 4; /* Prototype allocator assumes RGBA8888 (Bpp==4) */
+
+	if (drmModeAddFB2(drm_fd, width, height, DRM_FORMAT_XRGB8888,
+					  handles,
+					  strides, /* Replace or augment with metadata */
+					  offsets,
+					  &fb->fb_id,
+					  flags)) {
+		printf("Failed to create fb: %s\n", strerror(errno));
+		free(fb);
+		return NULL;
+	}
+
+	return fb;
+}
+#endif /* HAVE_ALLOCATOR */
 
 static uint32_t find_crtc_for_encoder(const drmModeRes *resources,
 		const drmModeEncoder *encoder) {

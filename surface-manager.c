@@ -23,6 +23,10 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "common.h"
 #include "drm-common.h"
 #include "surface-manager.h"
@@ -142,12 +146,57 @@ static const struct allocator * init_allocator(int drm_fd, int w, int h)
 		goto fail;
 	}
 
+	memset(allocator.allocations, 0, sizeof(allocator.allocations));
 	for (; allocs < ARRAY_SIZE(allocator.allocations); allocs++) {
+		struct allocation *alloc = &allocator.allocations[allocs];
+		struct drm_gem_close closeParams;
+		uint64_t allocation_size;
+		void *metadata;
+		size_t metadata_size;
+		int fd, res;
+		uint32_t gemHandle;
+
 		if (device_create_allocation(allocator.dev,
 									 &assertion,
 									 &capability_sets[0],
-									 &allocator.allocations[allocs])) {
+									 &alloc->alloc)) {
 			printf("Failed to create an allocation\n");
+			goto fail;
+		}
+
+		if (device_export_allocation(allocator.dev,
+									 alloc->alloc,
+									 &allocation_size,
+									 &metadata_size,
+									 &metadata,
+									 &fd)) {
+			printf("Failed to export an allocation\n");
+			goto fail;
+		}
+
+		res = drmPrimeFDToHandle(drm_fd,
+								 fd,
+								 &gemHandle);
+
+		close(fd);
+
+		if (res) {
+			free(metadata);
+			goto fail;
+		}
+
+		alloc->fb = drm_fb_get_from_gem(drm_fd,
+										gemHandle,
+										w, h,
+										metadata_size,
+										metadata);
+
+		memset(&closeParams, 0, sizeof(closeParams));
+		closeParams.handle = gemHandle;
+		drmIoctl(drm_fd, DRM_IOCTL_GEM_CLOSE, &closeParams);
+		free(metadata);
+
+		if (!allocator.allocations[allocs].fb) {
 			goto fail;
 		}
 	}
@@ -155,9 +204,15 @@ static const struct allocator * init_allocator(int drm_fd, int w, int h)
 	return &allocator;
 
 fail:
-	for (i = 0; i < allocs; i++) {
+	for (i = 0; i <= allocs; i++) {
+		struct allocation *alloc = &allocator.allocations[i];
+
+		if (alloc->fb) {
+			drm_fb_destroy(drm_fd, alloc->fb);
+		}
+
 		device_destroy_allocation(allocator.dev,
-								  allocator.allocations[i]);
+								  allocator.allocations[i].alloc);
 	}
 
 	device_destroy(allocator.dev);
