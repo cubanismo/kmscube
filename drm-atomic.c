@@ -162,18 +162,6 @@ out:
 	return ret;
 }
 
-static EGLSyncKHR create_fence(const struct egl *egl, int fd)
-{
-	EGLint attrib_list[] = {
-		EGL_SYNC_NATIVE_FENCE_FD_ANDROID, fd,
-		EGL_NONE,
-	};
-	EGLSyncKHR fence = egl->eglCreateSyncKHR(egl->display,
-			EGL_SYNC_NATIVE_FENCE_ANDROID, attrib_list);
-	assert(fence);
-	return fence;
-}
-
 static int atomic_run(const struct surfmgr *surfmgr, const struct egl *egl)
 {
 	struct drm_fb *fb = NULL;
@@ -185,15 +173,16 @@ static int atomic_run(const struct surfmgr *surfmgr, const struct egl *egl)
 	    egl_check(egl, eglCreateSyncKHR) ||
 	    egl_check(egl, eglDestroySyncKHR) ||
 	    egl_check(egl, eglWaitSyncKHR) ||
-	    egl_check(egl, eglClientWaitSyncKHR))
-		return -1;
+	    egl_check(egl, eglClientWaitSyncKHR)) {
+		printf("Falling back to blocking DRM-KMS commits\n");
+		flags &= ~DRM_MODE_ATOMIC_NONBLOCK;
+	}
 
 	/* Allow a modeset change for the first commit only. */
 	flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
 
 	while (1) {
 		struct drm_fb *last_fb;
-		EGLSyncKHR gpu_fence = NULL;   /* out-fence from gpu, in-fence to kms */
 		EGLSyncKHR kms_fence = NULL;   /* in-fence to gpu, out-fence from kms */
 
 		if (drm.kms_out_fence_fd != -1) {
@@ -213,20 +202,7 @@ static int atomic_run(const struct surfmgr *surfmgr, const struct egl *egl)
 
 		egl->draw(i++);
 
-		/* insert fence to be singled in cmdstream.. this fence will be
-		 * signaled when gpu rendering done
-		 */
-		gpu_fence = create_fence(egl, EGL_NO_NATIVE_FENCE_FD_ANDROID);
-		assert(gpu_fence);
-
-		eglSwapBuffers(egl->display, egl->surface);
-
-		/* after swapbuffers, gpu_fence should be flushed, so safe
-		 * to get fd:
-		 */
-		drm.kms_in_fence_fd = egl->eglDupNativeFenceFDANDROID(egl->display, gpu_fence);
-		egl->eglDestroySyncKHR(egl->display, gpu_fence);
-		assert(drm.kms_in_fence_fd != -1);
+		surfmgr_end_frame(surfmgr, egl, &drm.kms_in_fence_fd);
 
 		last_fb = fb;
 		fb = surfmgr_get_next_fb(surfmgr);

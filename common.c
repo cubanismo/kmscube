@@ -22,6 +22,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
@@ -298,4 +299,21 @@ int link_program(unsigned program)
 	}
 
 	return 0;
+}
+
+EGLSyncKHR create_fence(const struct egl *egl, int fd)
+{
+	EGLSyncKHR fence = EGL_NO_SYNC_KHR;
+
+	if (egl->eglDupNativeFenceFDANDROID) {
+		EGLint attrib_list[] = {
+			EGL_SYNC_NATIVE_FENCE_FD_ANDROID, fd,
+			EGL_NONE,
+		};
+		EGLSyncKHR fence = egl->eglCreateSyncKHR(egl->display,
+			EGL_SYNC_NATIVE_FENCE_ANDROID, attrib_list);
+		assert(fence);
+	}
+
+	return fence;
 }

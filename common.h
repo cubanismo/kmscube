@@ -224,6 +224,7 @@ static inline int __egl_check(void *ptr, const char *name)
 int init_egl(struct egl *egl, const struct surfmgr *surfmgr);
 int create_program(const char *vs_src, const char *fs_src);
 int link_program(unsigned program);
+EGLSyncKHR create_fence(const struct egl *egl, int fd);
 
 enum mode {
 	SMOOTH,        /* smooth-shaded */

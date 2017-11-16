@@ -28,5 +28,8 @@ const struct surfmgr * init_surfmgr(int drm_fd, int w, int h, uint64_t modifier)
 int init_surfmgr_egl(const struct surfmgr *surfmgr, const struct egl *egl);
 struct drm_fb *surfmgr_get_next_fb(const struct surfmgr *surfmgr);
 void surfmgr_release_fb(const struct surfmgr *surfmgr, struct drm_fb *fb);
+void surfmgr_end_frame(const struct surfmgr *surfmgr,
+					   const struct egl *egl,
+					   int *fence_fd);
 
 #endif /* _SURFACE_MANAGER_H */

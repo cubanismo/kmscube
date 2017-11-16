@@ -23,6 +23,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#include <assert.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -355,4 +356,40 @@ void surfmgr_release_fb(const struct surfmgr *surfmgr, struct drm_fb *fb)
 		/* Nothing to do for the allocator case */
 	}
 #endif
+}
+
+void surfmgr_end_frame(const struct surfmgr *surfmgr,
+					   const struct egl *egl,
+					   int *fence_fd)
+{
+	/* insert fence to be signaled in cmdstream.. this fence will be
+	 * signaled when gpu rendering done
+	 */
+	EGLSyncKHR gpu_fence = create_fence(egl, EGL_NO_NATIVE_FENCE_FD_ANDROID);
+
+	if (surfmgr->gbm) {
+		eglSwapBuffers(egl->display, egl->surface);
+	}
+#ifdef HAVE_ALLOCATOR
+	else if (surfmgr->allocator) {
+		uint32_t slot = (surfmgr->allocator->next_allocation + 1) %
+			ARRAY_SIZE(surfmgr->allocator->allocations);
+
+		glBindFramebuffer(GL_FRAMEBUFFER,
+						  surfmgr->allocator->allocations[slot].framebuffer);
+		glFlush();
+	}
+#endif
+
+	if (gpu_fence) {
+		/* after swapbuffers, gpu_fence should be flushed, so safe
+		 * to get fd:
+		 */
+		*fence_fd = egl->eglDupNativeFenceFDANDROID(egl->display, gpu_fence);
+		egl->eglDestroySyncKHR(egl->display, gpu_fence);
+		assert(*fence_fd != -1);
+	} else {
+		glFinish();
+		*fence_fd = -1;
+	}
 }
