@@ -60,7 +60,7 @@ int init_egl(struct egl *egl, const struct surfmgr *surfmgr)
 		EGL_NONE
 	};
 
-	static const EGLint config_attribs[] = {
+	static const EGLint win_config_attribs[] = {
 		EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
 		EGL_RED_SIZE, 1,
 		EGL_GREEN_SIZE, 1,
@@ -69,6 +69,20 @@ int init_egl(struct egl *egl, const struct surfmgr *surfmgr)
 		EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
 		EGL_NONE
 	};
+
+	static const EGLint nowin_config_attribs[] = {
+		EGL_SURFACE_TYPE, 0,
+		EGL_RED_SIZE, 1,
+		EGL_GREEN_SIZE, 1,
+		EGL_BLUE_SIZE, 1,
+		EGL_ALPHA_SIZE, 0,
+		EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+		EGL_NONE
+	};
+
+	const EGLint *config_attribs = surfmgr->gbm ?
+		win_config_attribs : nowin_config_attribs;
+
 	const char *egl_exts_client, *egl_exts_dpy, *gl_exts;
 
 #define get_proc_client(ext, name) do { \
@@ -87,12 +101,43 @@ int init_egl(struct egl *egl, const struct surfmgr *surfmgr)
 
 	egl_exts_client = eglQueryString(EGL_NO_DISPLAY, EGL_EXTENSIONS);
 	get_proc_client(EGL_EXT_platform_base, eglGetPlatformDisplayEXT);
+	get_proc_client(EGL_EXT_device_base, eglQueryDevicesEXT);
+	if (!egl->eglQueryDevicesEXT)
+		get_proc_client(EGL_EXT_device_enumeration, eglQueryDevicesEXT);
 
-	if (egl->eglGetPlatformDisplayEXT) {
-		egl->display = egl->eglGetPlatformDisplayEXT(EGL_PLATFORM_GBM_KHR,
-				surfmgr->gbm->dev, NULL);
+	if (surfmgr->gbm) {
+		if (egl->eglGetPlatformDisplayEXT) {
+			egl->display = egl->eglGetPlatformDisplayEXT(EGL_PLATFORM_GBM_KHR,
+														 surfmgr->gbm->dev,
+														 NULL);
+		} else {
+			egl->display = eglGetDisplay((void *)surfmgr->gbm->dev);
+		}
 	} else {
-		egl->display = eglGetDisplay((void *)surfmgr->gbm->dev);
+		EGLDeviceEXT device;
+		EGLint num_devices;
+
+		if (!egl->eglQueryDevicesEXT || !egl->eglGetPlatformDisplayEXT) {
+			printf("EGLDevice or EGL platforms not supported\n");
+			return -1;
+		}
+
+		/*
+		 * TODO: This should correlate the EGLDevices with the device
+		 * requested by the user some how, such as with the
+		 * EGL_DRM_DEVICE_FILE_EXT query from EGL_EXT_device_drm or a new UUID-
+		 * based mechanism similar to that used by GL_EXT_memory_objects.
+		 * Right now, the first available EGLDevice is used for simplicity.
+		 */
+		egl->eglQueryDevicesEXT(1, &device, &num_devices);
+
+		if (num_devices < 1) {
+			printf("No EGL devices present\n");
+			return -1;
+		}
+
+		egl->display = egl->eglGetPlatformDisplayEXT(EGL_PLATFORM_DEVICE_EXT,
+													 device, NULL);
 	}
 
 	if (!eglInitialize(egl->display, &major, &minor)) {
@@ -137,11 +182,15 @@ int init_egl(struct egl *egl, const struct surfmgr *surfmgr)
 		return -1;
 	}
 
-	egl->surface = eglCreateWindowSurface(egl->display, egl->config,
+	if (surfmgr->gbm) {
+		egl->surface = eglCreateWindowSurface(egl->display, egl->config,
 			(EGLNativeWindowType)surfmgr->gbm->surface, NULL);
-	if (egl->surface == EGL_NO_SURFACE) {
-		printf("failed to create egl surface\n");
-		return -1;
+		if (egl->surface == EGL_NO_SURFACE) {
+			printf("failed to create egl surface\n");
+			return -1;
+		}
+	} else {
+		egl->surface = EGL_NO_SURFACE;
 	}
 
 	/* connect the context to the surface */
