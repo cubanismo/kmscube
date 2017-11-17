@@ -83,7 +83,7 @@ static const struct gbm * init_gbm(int drm_fd, int w, int h, uint64_t modifier)
 }
 
 #ifdef HAVE_ALLOCATOR
-static const struct allocator * init_allocator(int drm_fd, int w, int h)
+static const struct allocator * init_allocator(int dev_fd, int drm_fd, int w, int h)
 {
 	assertion_t assertion = {
 		w,			/* width */
@@ -126,7 +126,7 @@ static const struct allocator * init_allocator(int drm_fd, int w, int h)
 	uint32_t i;
 	uint32_t allocs = 0;
 
-	allocator.dev = device_create(drm_fd);
+	allocator.dev = device_create(dev_fd);
 
 	if (!allocator.dev) {
 		goto fail;
@@ -207,15 +207,17 @@ static const struct allocator * init_allocator(int drm_fd, int w, int h)
 	return &allocator;
 
 fail:
-	for (i = 0; i <= allocs; i++) {
-		struct allocation *alloc = &allocator.allocations[i];
+	if (allocator.dev) {
+		for (i = 0; i <= allocs; i++) {
+			struct allocation *alloc = &allocator.allocations[i];
 
-		if (alloc->fb) {
-			drm_fb_destroy(drm_fd, alloc->fb);
+			if (alloc->fb) {
+				drm_fb_destroy(drm_fd, alloc->fb);
+			}
+
+			device_destroy_allocation(allocator.dev,
+									  alloc->alloc);
 		}
-
-		device_destroy_allocation(allocator.dev,
-								  alloc->alloc);
 	}
 
 	device_destroy(allocator.dev);
@@ -225,16 +227,19 @@ fail:
 }
 #endif /* HAVE_ALLOCATOR */
 
-const struct surfmgr * init_surfmgr(int drm_fd, int w, int h, uint64_t modifier)
+const struct surfmgr * init_surfmgr(int dev_fd, int drm_fd,
+									int w, int h, uint64_t modifier)
 {
 	surfmgr.width = w;
 	surfmgr.height = h;
 
 #ifdef HAVE_ALLOCATOR
-	surfmgr.allocator = init_allocator(drm_fd, w, h);
+	surfmgr.allocator = init_allocator(dev_fd, drm_fd, w, h);
 
 	if (surfmgr.allocator)
 		return &surfmgr;
+#else
+	(void)dev_fd;
 #endif
 
 	surfmgr.gbm = init_gbm(drm_fd, w, h, modifier);
@@ -315,7 +320,7 @@ int init_surfmgr_egl(const struct surfmgr *surfmgr, const struct egl *egl)
 	(void)egl;
 #endif /* HAVE_ALLOCATOR */
 
-    return 0;
+	return 0;
 }
 
 struct drm_fb *surfmgr_get_next_fb(const struct surfmgr *surfmgr)

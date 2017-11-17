@@ -24,6 +24,9 @@
 
 /* Based on a egl cube test app originally written by Arvin Schnell */
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,11 +45,12 @@ static const struct egl *egl;
 static const struct surfmgr *surfmgr;
 static const struct drm *drm;
 
-static const char *shortopts = "AD:M:m:V:";
+static const char *shortopts = "AD:S:M:m:V:";
 
 static const struct option longopts[] = {
 	{"atomic", no_argument,       0, 'A'},
 	{"device", required_argument, 0, 'D'},
+	{"surfmgrdev", required_argument, 0, 'S'},
 	{"mode",   required_argument, 0, 'M'},
 	{"modifier", required_argument, 0, 'm'},
 	{"video",  required_argument, 0, 'V'},
@@ -60,6 +64,7 @@ static void usage(const char *name)
 			"options:\n"
 			"    -A, --atomic             use atomic modesetting and fencing\n"
 			"    -D, --device=DEVICE      use the given device\n"
+			"    -S, --surfmgrdev=DEVICE  use the given device for surface mgr\n"
 			"    -M, --mode=MODE          specify mode, one of:\n"
 			"        smooth    -  smooth shaded cube (default)\n"
 			"        rgba      -  rgba textured cube\n"
@@ -73,9 +78,11 @@ static void usage(const char *name)
 int main(int argc, char *argv[])
 {
 	const char *device = "/dev/dri/card0";
+	const char *surfmgrdev = NULL;
 	const char *video = NULL;
 	enum mode mode = SMOOTH;
 	uint64_t modifier = DRM_FORMAT_MOD_INVALID;
+	int surfmgrfd;
 	int atomic = 0;
 	int opt;
 
@@ -91,6 +98,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'D':
 			device = optarg;
+			break;
+		case 'S':
+			surfmgrdev = optarg;
 			break;
 		case 'M':
 			if (strcmp(optarg, "smooth") == 0) {
@@ -129,7 +139,19 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	surfmgr = init_surfmgr(drm->fd, drm->mode->hdisplay, drm->mode->vdisplay,
+	if (!surfmgrdev) {
+		surfmgrfd = drm->fd;
+	} else {
+		surfmgrfd = open(surfmgrdev, O_RDWR);
+
+		if (surfmgrfd < 0) {
+			printf("could not open surface manager device\n");
+			return -1;
+		}
+	}
+
+	surfmgr = init_surfmgr(surfmgrfd, drm->fd,
+						   drm->mode->hdisplay, drm->mode->vdisplay,
 						   modifier);
 	if (!surfmgr) {
 		printf("failed to initialize any surface manager APIs\n");
