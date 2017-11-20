@@ -34,6 +34,10 @@
 #include <gbm.h>
 #include <drm_fourcc.h>
 
+#ifdef HAVE_ALLOCATOR
+#include <allocator/allocator.h>
+#endif
+
 #ifndef DRM_FORMAT_MOD_LINEAR
 #define DRM_FORMAT_MOD_LINEAR 0
 #endif
@@ -82,8 +86,17 @@ struct gbm {
 	struct gbm_surface *surface;
 };
 
+#ifdef HAVE_ALLOCATOR
+struct allocator {
+	device_t *dev;
+};
+#endif /* HAVE_ALLOCATOR */
+
 struct surfmgr {
 	const struct gbm * gbm;
+#ifdef HAVE_ALLOCATOR
+	const struct allocator * allocator;
+#endif
 
 	int width, height;
 };

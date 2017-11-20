@@ -28,6 +28,9 @@
 #include "surface-manager.h"
 
 static struct gbm gbm;
+#ifdef HAVE_ALLOCATOR
+static struct allocator allocator;
+#endif
 static struct surfmgr surfmgr;
 
 #ifdef HAVE_GBM_MODIFIERS
@@ -74,10 +77,28 @@ static const struct gbm * init_gbm(int drm_fd, int w, int h, uint64_t modifier)
 	return &gbm;
 }
 
+#ifdef HAVE_ALLOCATOR
+static const struct allocator * init_allocator(int drm_fd, int w, int h)
+{
+	allocator.dev = device_create(drm_fd);
+	(void)w;
+	(void)h;
+
+	return &allocator;
+}
+#endif /* HAVE_ALLOCATOR */
+
 const struct surfmgr * init_surfmgr(int drm_fd, int w, int h, uint64_t modifier)
 {
 	surfmgr.width = w;
 	surfmgr.height = h;
+
+#ifdef HAVE_ALLOCATOR
+	surfmgr.allocator = init_allocator(drm_fd, w, h);
+
+	if (surfmgr.allocator)
+		return &surfmgr;
+#endif
 
 	surfmgr.gbm = init_gbm(drm_fd, w, h, modifier);
 
