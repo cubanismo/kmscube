@@ -262,6 +262,16 @@ int init_surfmgr_egl(const struct surfmgr *surfmgr, const struct egl *egl)
 {
 #ifdef HAVE_ALLOCATOR
 	if (surfmgr->allocator) {
+		if (!egl->glCreateMemoryObjectsEXT ||
+			!egl->glCreateMemoryObjectsEXT ||
+			!egl->glMemoryObjectParameterivEXT ||
+			!egl->glTexStorageMem2DEXT ||
+			!egl->glImportMemoryFdEXT ||
+			!egl->glTexParametervNVX) {
+			printf("GL memory object extensions not supported\n");
+			return -1;
+		}
+
 		uint32_t i;
 		for (i = 0; i < ARRAY_SIZE(surfmgr->allocator->allocations); i++) {
 			const struct allocation *alloc = &surfmgr->allocator->allocations[i];
