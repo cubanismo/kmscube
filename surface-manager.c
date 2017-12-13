@@ -227,25 +227,29 @@ fail:
 }
 #endif /* HAVE_ALLOCATOR */
 
-const struct surfmgr * init_surfmgr(int dev_fd, int drm_fd,
+const struct surfmgr * init_surfmgr(int dev_fd, int drm_fd, enum backend backend,
 									int w, int h, uint64_t modifier)
 {
 	surfmgr.width = w;
 	surfmgr.height = h;
 
 #ifdef HAVE_ALLOCATOR
-	surfmgr.allocator = init_allocator(dev_fd, drm_fd, w, h);
+	if (backend == ALLOCATOR) {
+		surfmgr.allocator = init_allocator(dev_fd, drm_fd, w, h);
 
-	if (surfmgr.allocator)
-		return &surfmgr;
+		if (surfmgr.allocator)
+			return &surfmgr;
+	}
 #else
 	(void)dev_fd;
 #endif
 
-	surfmgr.gbm = init_gbm(drm_fd, w, h, modifier);
+	if (backend == GBM) {
+		surfmgr.gbm = init_gbm(drm_fd, w, h, modifier);
 
-	if (surfmgr.gbm)
-		return &surfmgr;
+		if (surfmgr.gbm)
+			return &surfmgr;
+	}
 
 	/* Initialization failed. */
 	surfmgr.width = 0;
