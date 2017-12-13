@@ -178,11 +178,6 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	if (!atomic && !surfmgr->gbm) {
-		printf("Legacy DRM requires GBM\n");
-		return -1;
-	}
-
 	if (mode == SMOOTH)
 		egl = init_cube_smooth(surfmgr);
 	else if (mode == VIDEO)

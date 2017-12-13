@@ -28,6 +28,7 @@
 
 #include "common.h"
 #include "drm-common.h"
+#include "surface-manager.h"
 
 static struct drm drm;
 
@@ -48,7 +49,6 @@ static int legacy_run(const struct surfmgr *surfmgr, const struct egl *egl)
 			.version = 2,
 			.page_flip_handler = page_flip_handler,
 	};
-	struct gbm_bo *bo;
 	struct drm_fb *fb;
 	uint32_t i = 0;
 	int ret;
@@ -57,9 +57,9 @@ static int legacy_run(const struct surfmgr *surfmgr, const struct egl *egl)
 	FD_SET(0, &fds);
 	FD_SET(drm.fd, &fds);
 
-	eglSwapBuffers(egl->display, egl->surface);
-	bo = gbm_surface_lock_front_buffer(surfmgr->gbm->surface);
-	fb = drm_fb_get_from_bo(bo);
+	surfmgr_end_frame(surfmgr, egl, &drm.kms_in_fence_fd);
+	fb = surfmgr_get_next_fb(surfmgr);
+
 	if (!fb) {
 		fprintf(stderr, "Failed to get a new framebuffer BO\n");
 		return -1;
@@ -74,14 +74,14 @@ static int legacy_run(const struct surfmgr *surfmgr, const struct egl *egl)
 	}
 
 	while (1) {
-		struct gbm_bo *next_bo;
+		struct drm_fb *last_fb;
 		int waiting_for_flip = 1;
 
 		egl->draw(i++);
 
-		eglSwapBuffers(egl->display, egl->surface);
-		next_bo = gbm_surface_lock_front_buffer(surfmgr->gbm->surface);
-		fb = drm_fb_get_from_bo(next_bo);
+		surfmgr_end_frame(surfmgr, egl, &drm.kms_in_fence_fd);
+		last_fb = fb;
+		fb = surfmgr_get_next_fb(surfmgr);
 		if (!fb) {
 			fprintf(stderr, "Failed to get a new framebuffer BO\n");
 			return -1;
@@ -115,8 +115,7 @@ static int legacy_run(const struct surfmgr *surfmgr, const struct egl *egl)
 		}
 
 		/* release last buffer to render on again: */
-		gbm_surface_release_buffer(surfmgr->gbm->surface, bo);
-		bo = next_bo;
+		surfmgr_release_fb(surfmgr, last_fb);
 	}
 
 	return 0;
