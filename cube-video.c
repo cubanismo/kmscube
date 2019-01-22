@@ -306,8 +306,9 @@ const struct egl * init_cube_video(const struct surfmgr *surfmgr,
 {
 	char *fnames, *s;
 	int ret, i = 0;
+	const struct gbm *gbm = surfmgr->gbm;
 
-	if (!surfmgr->gbm) {
+	if (!gbm) {
 		printf("video support currently requires GBM\n");
 		return NULL;
 	}
@@ -338,7 +339,7 @@ const struct egl * init_cube_video(const struct surfmgr *surfmgr,
 		return NULL;
 	}
 
-	gl.aspect = (GLfloat)(gbm->height) / (GLfloat)(gbm->width);
+	gl.aspect = (GLfloat)(surfmgr->height) / (GLfloat)(surfmgr->width);
 	gl.gbm = gbm;
 
 	ret = create_program(blit_vs, blit_fs);
@@ -375,7 +376,7 @@ const struct egl * init_cube_video(const struct surfmgr *surfmgr,
 	gl.normalmatrix = glGetUniformLocation(gl.program, "normalMatrix");
 	gl.texture   = glGetUniformLocation(gl.program, "uTex");
 
-	glViewport(0, 0, gbm->width, gbm->height);
+	glViewport(0, 0, surfmgr->width, surfmgr->height);
 	glEnable(GL_CULL_FACE);
 
 	gl.positionsoffset = 0;
