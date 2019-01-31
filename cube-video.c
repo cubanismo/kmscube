@@ -332,14 +332,14 @@ const struct egl * init_cube_video(const struct surfmgr *surfmgr,
 	gl.filenames[i] = fnames;
 	gl.filenames_count = ++i;
 
-	gl.decoder = video_init(&gl.egl, gbm, gl.filenames[gl.idx]);
+	gl.decoder = video_init(&gl.egl, surfmgr->gbm, gl.filenames[gl.idx]);
 	if (!gl.decoder) {
 		printf("cannot create video decoder\n");
 		return NULL;
 	}
 
-	gl.aspect = (GLfloat)(gbm->height) / (GLfloat)(gbm->width);
-	gl.gbm = gbm;
+	gl.aspect = (GLfloat)(surfmgr->height) / (GLfloat)(surfmgr->width);
+	gl.gbm = surfmgr->gbm;
 
 	ret = create_program(blit_vs, blit_fs);
 	if (ret < 0)
@@ -375,7 +375,7 @@ const struct egl * init_cube_video(const struct surfmgr *surfmgr,
 	gl.normalmatrix = glGetUniformLocation(gl.program, "normalMatrix");
 	gl.texture   = glGetUniformLocation(gl.program, "uTex");
 
-	glViewport(0, 0, gbm->width, gbm->height);
+	glViewport(0, 0, surfmgr->width, surfmgr->height);
 	glEnable(GL_CULL_FACE);
 
 	gl.positionsoffset = 0;
