@@ -45,15 +45,16 @@ static const struct egl *egl;
 static const struct surfmgr *surfmgr;
 static const struct drm *drm;
 
-static const char *shortopts = "AD:S:M:m:V:";
+static const char *shortopts = "AD:S:B:M:m:V:";
 
 static const struct option longopts[] = {
-	{"atomic", no_argument,       0, 'A'},
-	{"device", required_argument, 0, 'D'},
+	{"atomic",     no_argument,       0, 'A'},
+	{"device",     required_argument, 0, 'D'},
 	{"surfmgrdev", required_argument, 0, 'S'},
-	{"mode",   required_argument, 0, 'M'},
-	{"modifier", required_argument, 0, 'm'},
-	{"video",  required_argument, 0, 'V'},
+	{"backend",    required_argument, 0, 'B'},
+	{"mode",       required_argument, 0, 'M'},
+	{"modifier",   required_argument, 0, 'm'},
+	{"video",      required_argument, 0, 'V'},
 	{0, 0, 0, 0}
 };
 
@@ -65,6 +66,11 @@ static void usage(const char *name)
 			"    -A, --atomic             use atomic modesetting and fencing\n"
 			"    -D, --device=DEVICE      use the given device\n"
 			"    -S, --surfmgrdev=DEVICE  use the given device for surface mgr\n"
+			"    -B, --backend=BACKEND    specify backend, one of:\n"
+			"        gbm       - Create buffers using GBM (default)\n"
+#ifdef HAVE_ALLOCATOR
+			"        allocator - Create buffers using the Generic allocator\n"
+#endif
 			"    -M, --mode=MODE          specify mode, one of:\n"
 			"        smooth    -  smooth shaded cube (default)\n"
 			"        rgba      -  rgba textured cube\n"
@@ -79,6 +85,7 @@ int main(int argc, char *argv[])
 {
 	const char *device = "/dev/dri/card0";
 	const char *surfmgrdev = NULL;
+	enum backend backend = GBM;
 	const char *video = NULL;
 	enum mode mode = SMOOTH;
 	uint64_t modifier = DRM_FORMAT_MOD_INVALID;
@@ -101,6 +108,19 @@ int main(int argc, char *argv[])
 			break;
 		case 'S':
 			surfmgrdev = optarg;
+			break;
+		case 'B':
+			if (strcmp(optarg, "gbm") == 0) {
+				backend = GBM;
+#ifdef HAVE_ALLOCATOR
+			} else if (strcmp(optarg, "allocator") == 0) {
+				backend = ALLOCATOR;
+#endif
+			} else {
+				printf("invalid backend: %s\n", optarg);
+				usage(argv[0]);
+				return -1;
+			}
 			break;
 		case 'M':
 			if (strcmp(optarg, "smooth") == 0) {
@@ -150,16 +170,11 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	surfmgr = init_surfmgr(surfmgrfd, drm->fd,
+	surfmgr = init_surfmgr(surfmgrfd, drm->fd, backend,
 						   drm->mode->hdisplay, drm->mode->vdisplay,
 						   modifier);
 	if (!surfmgr) {
 		printf("failed to initialize any surface manager APIs\n");
-		return -1;
-	}
-
-	if (!atomic && !surfmgr->gbm) {
-		printf("Legacy DRM requires GBM\n");
 		return -1;
 	}
 

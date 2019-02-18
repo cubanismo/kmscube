@@ -227,25 +227,29 @@ fail:
 }
 #endif /* HAVE_ALLOCATOR */
 
-const struct surfmgr * init_surfmgr(int dev_fd, int drm_fd,
+const struct surfmgr * init_surfmgr(int dev_fd, int drm_fd, enum backend backend,
 									int w, int h, uint64_t modifier)
 {
 	surfmgr.width = w;
 	surfmgr.height = h;
 
 #ifdef HAVE_ALLOCATOR
-	surfmgr.allocator = init_allocator(dev_fd, drm_fd, w, h);
+	if (backend == ALLOCATOR) {
+		surfmgr.allocator = init_allocator(dev_fd, drm_fd, w, h);
 
-	if (surfmgr.allocator)
-		return &surfmgr;
+		if (surfmgr.allocator)
+			return &surfmgr;
+	}
 #else
 	(void)dev_fd;
 #endif
 
-	surfmgr.gbm = init_gbm(drm_fd, w, h, modifier);
+	if (backend == GBM) {
+		surfmgr.gbm = init_gbm(drm_fd, w, h, modifier);
 
-	if (surfmgr.gbm)
-		return &surfmgr;
+		if (surfmgr.gbm)
+			return &surfmgr;
+	}
 
 	/* Initialization failed. */
 	surfmgr.width = 0;
@@ -258,6 +262,16 @@ int init_surfmgr_egl(const struct surfmgr *surfmgr, const struct egl *egl)
 {
 #ifdef HAVE_ALLOCATOR
 	if (surfmgr->allocator) {
+		if (!egl->glCreateMemoryObjectsEXT ||
+			!egl->glCreateMemoryObjectsEXT ||
+			!egl->glMemoryObjectParameterivEXT ||
+			!egl->glTexStorageMem2DEXT ||
+			!egl->glImportMemoryFdEXT ||
+			!egl->glTexParametervNVX) {
+			printf("GL memory object extensions not supported\n");
+			return -1;
+		}
+
 		uint32_t i;
 		for (i = 0; i < ARRAY_SIZE(surfmgr->allocator->allocations); i++) {
 			const struct allocation *alloc = &surfmgr->allocator->allocations[i];

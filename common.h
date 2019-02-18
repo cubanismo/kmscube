@@ -185,6 +185,13 @@ struct surfmgr {
 	int width, height;
 };
 
+enum backend {
+	GBM,        /* Use GBM to create buffers */
+#ifdef HAVE_ALLOCATOR
+	ALLOCATOR,  /* Use Generic allocator to create buffers */
+#endif
+};
+
 struct egl {
 	EGLDisplay display;
 	EGLConfig config;

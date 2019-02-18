@@ -116,30 +116,37 @@ int init_egl(struct egl *egl, const struct surfmgr *surfmgr)
 			egl->display = eglGetDisplay((void *)surfmgr->gbm->dev);
 		}
 	} else {
-		EGLDeviceEXT device;
-		EGLint num_devices;
+		if (egl->eglQueryDevicesEXT && egl->eglGetPlatformDisplayEXT) {
+			EGLDeviceEXT device;
+			EGLint num_devices;
 
-		if (!egl->eglQueryDevicesEXT || !egl->eglGetPlatformDisplayEXT) {
-			printf("EGLDevice or EGL platforms not supported\n");
+			/*
+			 * TODO: This should correlate the EGLDevices with the device
+			 * requested by the user some how, such as with the
+			 * EGL_DRM_DEVICE_FILE_EXT query from EGL_EXT_device_drm or a new
+			 * UUID-based mechanism similar to that used by
+			 * GL_EXT_memory_objects. Right now, the first available EGLDevice
+			 * is used for simplicity.
+			 */
+			egl->eglQueryDevicesEXT(1, &device, &num_devices);
+
+			if (num_devices < 1) {
+				printf("No EGL devices present\n");
+				return -1;
+			}
+
+			egl->display = egl->eglGetPlatformDisplayEXT(EGL_PLATFORM_DEVICE_EXT,
+														 device, NULL);
+		} else if (has_ext(egl_exts_client, "EGL_MESA_platform_surfaceless") &&
+				   egl->eglGetPlatformDisplayEXT) {
+			egl->display =
+				egl->eglGetPlatformDisplayEXT(EGL_PLATFORM_SURFACELESS_MESA,
+											  EGL_DEFAULT_DISPLAY, NULL);
+		} else {
+			printf("Neither EGL_EXT_platform_device or "
+				   "EGL_MESA_platform_surfaceless are supported\n");
 			return -1;
 		}
-
-		/*
-		 * TODO: This should correlate the EGLDevices with the device
-		 * requested by the user some how, such as with the
-		 * EGL_DRM_DEVICE_FILE_EXT query from EGL_EXT_device_drm or a new UUID-
-		 * based mechanism similar to that used by GL_EXT_memory_objects.
-		 * Right now, the first available EGLDevice is used for simplicity.
-		 */
-		egl->eglQueryDevicesEXT(1, &device, &num_devices);
-
-		if (num_devices < 1) {
-			printf("No EGL devices present\n");
-			return -1;
-		}
-
-		egl->display = egl->eglGetPlatformDisplayEXT(EGL_PLATFORM_DEVICE_EXT,
-													 device, NULL);
 	}
 
 	if (!eglInitialize(egl->display, &major, &minor)) {
